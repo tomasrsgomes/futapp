@@ -39,7 +39,6 @@ def remaining_games(n, played):
 
 
 def solve_for_team(t, n, points, games):
-    # Pruning: Check if t can possibly catch up to the current leader
     t_games_count = sum(1 for (i, j) in games if i == t or j == t)
     max_possible_t = points[t] + 3 * t_games_count
     
@@ -48,27 +47,16 @@ def solve_for_team(t, n, points, games):
             return -1
 
     prob = pulp.LpProblem(f"Team_{t}", pulp.LpMinimize)
-
-    # Variables
-    # u[(i,j)] = 1 if i wins
-    # v[(i,j)] = 1 if j wins
-    # For games involving t, we only create the variable for t winning.
     
     u = {}
     v = {}
     
     obj_terms = []
-    
-    # We need to track points from games for each team
-    # points_from_games[k] will be a linear expression
+
     points_from_games = [0] * n
     
     for (i, j) in games:
         if i == t:
-            # t is i. t never loses.
-            # i wins: u=1. Draw: u=0.
-            # i pts: 3u + 1(1-u) = 2u + 1
-            # j pts: 0u + 1(1-u) = 1 - u
             u_var = pulp.LpVariable(f"u_{i}_{j}", cat='Binary')
             u[(i, j)] = u_var
             obj_terms.append(u_var)
@@ -77,10 +65,6 @@ def solve_for_team(t, n, points, games):
             points_from_games[j] += 1 - u_var
             
         elif j == t:
-            # t is j. t never loses.
-            # j wins: v=1. Draw: v=0.
-            # j pts: 3v + 1(1-v) = 2v + 1
-            # i pts: 0v + 1(1-v) = 1 - v
             v_var = pulp.LpVariable(f"v_{i}_{j}", cat='Binary')
             v[(i, j)] = v_var
             obj_terms.append(v_var)
@@ -89,10 +73,6 @@ def solve_for_team(t, n, points, games):
             points_from_games[i] += 1 - v_var
             
         else:
-            # Game between others
-            # i wins (u), j wins (v), draw (1-u-v)
-            # i pts: 3u + 1(1-u-v) = 2u - v + 1
-            # j pts: 3v + 1(1-u-v) = 2v - u + 1
             u_var = pulp.LpVariable(f"u_{i}_{j}", cat='Binary')
             v_var = pulp.LpVariable(f"v_{i}_{j}", cat='Binary')
             u[(i, j)] = u_var
@@ -104,9 +84,6 @@ def solve_for_team(t, n, points, games):
             points_from_games[j] += 2 * v_var - u_var + 1
 
     prob += pulp.lpSum(obj_terms)
-
-    # Constraints
-    # points[t] + points_from_games[t] >= points[k] + points_from_games[k]
     
     final_t = points[t] + points_from_games[t]
     
@@ -114,7 +91,6 @@ def solve_for_team(t, n, points, games):
         if k != t:
             rhs = points[k] + points_from_games[k]
             if isinstance(final_t, (int, float)) and isinstance(rhs, (int, float)):
-                # Both constants. Pruning ensured final_t >= rhs.
                 continue
             prob += final_t >= rhs
 
